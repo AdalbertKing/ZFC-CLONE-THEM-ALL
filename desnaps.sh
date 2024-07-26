@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Author: Wojciech KrĂłl & Chat-GPT 4
+# SnapSend Script
+# Author: Wojciech Król & ChatGPT-4o
 # Email: lurk@lurk.com.pl
-# Ver: 1.0 from 2024-07-26
+# Version: 1.0 (2024-07-26)
 
 # Description:
 # This script deletes ZFS snapshots based on a specified age threshold.
