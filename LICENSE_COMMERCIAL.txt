@@ -1,0 +1,10 @@
+Commercial License
+
+Copyright (c) 2024 Wojciech Król
+
+This software is licensed for commercial use. You may use, modify, and distribute
+this software under the terms of the Commercial License. For detailed terms and 
+conditions, please contact Wojciech Król at lurk@lurk.com.pl.
+
+Unauthorized use of this software outside of the scope of the Commercial License
+is strictly prohibited.

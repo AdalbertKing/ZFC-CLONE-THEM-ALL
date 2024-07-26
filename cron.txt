@@ -1,0 +1,32 @@
+MAILTO=""
+SHELL=/bin/bash
+PATH=/etc:/bin:/sbin:/usr/bin:/usr/sbin:/root/skrypty:/root/scripts/zfs-snapshot-all
+
+#30 18 * * * /root/skrypty/qm-day.sh >>/root/skrypty/cron.log
+#59 6 * * 1-5 /root/skrypty/102.sh >>/root/skrypty/cron.log
+
+0 * * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_hourly_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
+5 * * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_hourly_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0,hdd/vm-disks/vm-100-disk-0,hdd/vm-disks/vm-102-disk-0" "192.168.28.8:" 2>>/root/scripts/cron.log
+
+10 0 * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_daily_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
+15 * * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_daily_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0,>
+
+16 0 * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_daily_" "rpool/ROOT/pve-1" "192.168.28.8:hdd/kopie/pve1" 2>>/root/scripts/cron.log
+
+20 0 * * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_weekly_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
+25 0 * * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_weekly_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0>
+
+30 0 1 * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_monthly_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
+35 0 1 * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_monthly_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk->
+
+40 * * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_hourly -h24 2>>/root/scripts/cron.log
+
+46 0 * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_daily -d30 2>>/root/scripts/cron.log
+
+48 0 * * 0 /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_weekly -w4 2>>/root/scripts/cron.log
+
+50 0 1 * 0 /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_monthly -m12 2>>/root/scripts/cron.log
+
+
+
+
