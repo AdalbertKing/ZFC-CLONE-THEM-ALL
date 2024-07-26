@@ -1,4 +1,8 @@
-# SnapSend & DelSnaps
+
+### Plik `README.md` (angielski)
+
+```markdown
+# ZFS-snaps-remote-clone-synchro-and-delete
 
 ## Description
 
