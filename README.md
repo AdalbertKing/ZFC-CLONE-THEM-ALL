@@ -10,7 +10,7 @@ These scripts are designed to automate the process of creating, sending, and del
 - Email: lurk@lurk.com.pl
 - Version: 1.1, 2024-07-27
 
-## `snapsend02.sh`
+## `snapsend.sh`
 
 ### Description
 
