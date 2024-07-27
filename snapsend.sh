@@ -2,40 +2,28 @@
 
 # Author: Wojciech Król & ChatGPT-4o
 # Email: lurk@lurk.com.pl
-# Version: 1.1, 2024-07-27
+# Version: 1.3, 2024-07-27
 
-# Description:
-# This script automates the process of creating and sending ZFS snapshots. 
-# It supports both local and remote destinations, with options for recursion, 
-# compression, and buffering. 
+# This script is a powerful tool for ZFS snapshot management, including options for remote and local operations, 
+# compression, buffering, and forceful full send in case of incremental send failure.
 
-# Usage:
-# ./snapsend.sh [options] <local_datasets> <remote>
+# WARNING: Using -f in combination with -R can lead to full send for all child datasets if any issue occurs in one of them.
+# This can result in long transfer times and high network usage. Use with caution.
 
-# Options:
-# -m <snapshot_prefix>       Specify a custom prefix for snapshots.
-# -u <remote_user>           Specify the SSH user for remote operations.
-# -p <remote_password>       Specify the SSH password for remote operations.
-# -R                         Enable recursive operation.
-# -b                         Use mbuffer for buffering.
-# -z                         Enable compression with gzip.
-# -f                         Force full send if incremental send fails.
-# -F                         Always perform a full send.
+# Required utilities: sshpass (for password-based SSH login), mbuffer (for buffering), gzip (for compression)
 
 # Examples:
+# Local send:
+# ./snapsend02.sh -m "snapshot_" "tank/dataset" "tank/backup"
+# Remote send with SSH password:
+# ./snapsend02.sh -m "snapshot_" -u "root" -p "password" "tank/dataset" "remote_server:tank/backup"
+# Recursive send with mbuffer and compression:
+# ./snapsend02.sh -m "snapshot_" -R -b -z "tank/dataset" "remote_server:tank/backup"
+# Force full send if incremental fails:
+# ./snapsend02.sh -m "snapshot_" -f "tank/dataset" "remote_server:tank/backup"
+# Immediate full send:
+# ./snapsend02.sh -m "snapshot_" -F "tank/dataset" "remote_server:tank/backup"
 
-# Local Backup:
-# ./snapsend.sh -m "automated_hourly_" "rpool/data" "local_backup_path"
-
-# Remote Backup:
-# ./snapsend.sh -m "automated_hourly_" -u "root" -p "password" -b -z "rpool/data" "192.168.28.8:remote_backup_path"
-
-# Remote Sync:
-# ./snapsend.sh -m "automated_hourly_" -R -u "root" -p "password" -F "rpool/data" "192.168.28.8:remote_backup_path"
-
-# The script continues below with actual implementation...
-
-# Plik PID do monitorowania jednoczesnego uruchomienia skryptu
 PIDFILE="/var/run/snapsend.pid"
 LOGFILE="/var/log/snapsend.log"
 
@@ -55,35 +43,37 @@ remote_password=""
 recursive=false
 use_mbuffer=false
 compression=false
+force_incremental=false
+force_full=false
 
 trap 'rm -f "$PIDFILE"; exit 0' INT TERM EXIT
 
-# Parsing opcji
+# Parsing options
 while getopts "m:u:p:RbzfF" opt; do
   case $opt in
     m)
-      snapshot_prefix=$OPTARG  # Niestandardowy prefix snapshotu
+      snapshot_prefix=$OPTARG  # Custom snapshot prefix
       ;;
     u)
-      remote_user=$OPTARG  # Niestandardowy uĹĽytkownik SSH
+      remote_user=$OPTARG  # Custom SSH user
       ;;
     p)
-      remote_password=$OPTARG  # HasĹ‚o SSH
+      remote_password=$OPTARG  # SSH password
       ;;
     R)
-      recursive=true  # Rekurencja
+      recursive=true  # Recursion
       ;;
     b)
-      use_mbuffer=true  # UĹĽycie mbuffer
+      use_mbuffer=true  # Use mbuffer
       ;;
     z)
-      compression=true  # UĹĽycie kompresji
+      compression=true  # Use compression
       ;;
     f)
-      force_full_send=true  # Force full send if incremental send fails
+      force_incremental=true  # Force full send if incremental fails
       ;;
     F)
-      always_full_send=true  # Always perform a full send
+      force_full=true  # Force full send immediately
       ;;
     \?)
       log "Invalid option: -$OPTARG"
@@ -94,11 +84,11 @@ while getopts "m:u:p:RbzfF" opt; do
 done
 shift $((OPTIND -1))
 
-# Argumenty
+# Arguments
 local_datasets="$1"
 remote="$2"
 
-# Walidacja argumentĂłw wejĹ›ciowych
+# Validate input arguments
 if [[ -z "$local_datasets" || -z "$remote" ]]; then
   log "Usage: $0 [-m snapshot_prefix] [-u remote_user] [-p remote_password] [-R] [-b] [-z] [-f] [-F] local_datasets remote"
   rm -f "$PIDFILE"
@@ -109,7 +99,7 @@ IFS=',' read -r -a datasets <<< "$local_datasets"
 remote_server="${remote%%:*}"
 remote_path="${remote#*:}"
 
-# Sprawdzenie, czy operacja jest lokalna
+# Check if operation is local
 is_local=false
 if [[ "$remote_server" == "$remote" ]]; then
   is_local=true
@@ -117,28 +107,38 @@ if [[ "$remote_server" == "$remote" ]]; then
   remote_path="$remote"
 fi
 
-# Funkcja do usuwania koĹ„cowego znaku "/"
+# Remove trailing slash
 remove_trailing_slash() {
   echo "${1%/}"
 }
 
-# Funkcja do logowania siÄ™ na zdalny serwer z uĹĽyciem hasĹ‚a
+# SSH with password
 ssh_with_password() {
   log "Connecting to remote server with password: sshpass -p $remote_password ssh -o StrictHostKeyChecking=no $remote_user@$remote_server \"$*\""
   sshpass -p "$remote_password" ssh -o StrictHostKeyChecking=no "$remote_user@$remote_server" "$@"
 }
 
-# GĹ‚Ăłwna pÄ™tla przetwarzajÄ…ca dataset
+# Function to delete all snapshots in the remote dataset
+delete_remote_snapshots() {
+  local remote_dataset="$1"
+  if [ -n "$remote_password" ]; then
+    ssh_with_password "zfs list -H -o name -t snapshot -r $remote_dataset | xargs -n1 zfs destroy"
+  else
+    ssh "$remote_user@$remote_server" "zfs list -H -o name -t snapshot -r $remote_dataset | xargs -n1 zfs destroy"
+  fi
+}
+
+# Main dataset processing loop
 for dataset in "${datasets[@]}"; do
   local_dataset=$(remove_trailing_slash "$dataset")
 
-  # Sprawdzenie, czy dataset istnieje po stronie source
+  # Check if source dataset exists
   if ! zfs list "$local_dataset" &>/dev/null; then
     log "Dataset does not exist: $local_dataset"
     continue
   fi
 
-  # Ustawienie opcji rekurencji
+  # Set recursion options
   snapshot_opts=""
   send_opts=""
   if [ "$recursive" = true ]; then
@@ -146,7 +146,7 @@ for dataset in "${datasets[@]}"; do
     send_opts="-R"
   fi
 
-  # Sprawdzanie i tworzenie zdalnej Ĺ›cieĹĽki datasetu
+  # Build remote dataset path
   if [ -n "$remote_path" ]; then
     remote_dataset_path="${remote_path}/${local_dataset}"
   else
@@ -154,7 +154,7 @@ for dataset in "${datasets[@]}"; do
   fi
   remote_dataset_path=$(remove_trailing_slash "$remote_dataset_path")
 
-  # Zapewnienie istnienia zdalnego datasetu
+  # Ensure remote dataset exists
   if [ "$is_local" = true ]; then
     log "Ensuring local dataset exists: $remote_dataset_path"
     zfs list "$remote_dataset_path" 2>/dev/null || zfs create -p "$remote_dataset_path"
@@ -168,7 +168,7 @@ for dataset in "${datasets[@]}"; do
     fi
   fi
 
-  # Tworzenie lokalnego snapshotu
+  # Create local snapshot
   timestamp=$(date +%F_%H-%M-%S)
   local_snapshot="${local_dataset}@${snapshot_prefix}${timestamp}"
   log "Creating local snapshot: $local_snapshot"
@@ -178,56 +178,70 @@ for dataset in "${datasets[@]}"; do
     continue
   fi
 
-  # Wyszukiwanie ostatniego zdalnego snapshotu
-  log "Finding latest remote snapshot in $remote_dataset_path"
-  if [ "$is_local" = true ]; then
-    latest_remote_snapshot=$(zfs list -H -o name,creation -p -t snapshot -r "$remote_dataset_path" | grep "^$remote_dataset_path@" | sort -n -k 2 | tail -1 | awk '{print $1}')
+  # Handle force full send option
+  if [ "$force_full" = true ]; then
+    log "Force full send enabled. Deleting all remote snapshots in $remote_dataset_path"
+    delete_remote_snapshots "$remote_dataset_path"
+    latest_remote_snapshot=""
   else
-    if [ -n "$remote_password" ]; then
-      log "SSH Command: ssh_with_password \"$remote_user@$remote_server\" \"zfs list -H -o name,creation -p -t snapshot -r $remote_dataset_path | grep '^$remote_dataset_path@' | sort -n -k 2 | tail -1 | awk '{print \$1}'\""
-      latest_remote_snapshot=$(ssh_with_password "zfs list -H -o name,creation -p -t snapshot -r $remote_dataset_path | grep '^$remote_dataset_path@' | sort -n -k 2 | tail -1 | awk '{print \$1}'")
+    # Find latest remote snapshot
+    log "Finding latest remote snapshot in $remote_dataset_path"
+    if [ "$is_local" = true ]; then
+      latest_remote_snapshot=$(zfs list -H -o name,creation -p -t snapshot -r "$remote_dataset_path" | grep "^$remote_dataset_path@" | sort -n -k 2 | tail -1 | awk '{print $1}')
     else
-      log "SSH Command: ssh $remote_user@$remote_server \"zfs list -H -o name,creation -p -t snapshot -r $remote_dataset_path | grep '^$remote_dataset_path@' | sort -n -k 2 | tail -1 | awk '{print \$1}'\""
-      latest_remote_snapshot=$(ssh "$remote_user@$remote_server" "zfs list -H -o name,creation -p -t snapshot -r $remote_dataset_path | grep '^$remote_dataset_path@' | sort -n -k 2 | tail -1 | awk '{print \$1}'")
+      if [ -n "$remote_password" ]; then
+        log "SSH Command: ssh_with_password \"$remote_user@$remote_server\" \"zfs list -H -o name,creation -p -t snapshot -r $remote_dataset_path | grep '^$remote_dataset_path@' | sort -n -k 2 | tail -1 | awk '{print \$1}'\""
+        latest_remote_snapshot=$(ssh_with_password "zfs list -H -o name,creation -p -t snapshot -r $remote_dataset_path | grep '^$remote_dataset_path@' | sort -n -k 2 | tail -1 | awk '{print \$1}'")
+      else
+        log "SSH Command: ssh $remote_user@$remote_server \"zfs list -H -o name,creation -p -t snapshot -r $remote_dataset_path | grep '^$remote_dataset_path@' | sort -n -k 2 | tail -1 | awk '{print \$1}'\""
+        latest_remote_snapshot=$(ssh "$remote_user@$remote_server" "zfs list -H -o name,creation -p -t snapshot -r $remote_dataset_path | grep '^$remote_dataset_path@' | sort -n -k 2 | tail -1 | awk '{print \$1}'")
+      fi
     fi
   fi
+
+  incremental_success=false
 
   if [ -n "$latest_remote_snapshot" ]; then
     log "Latest remote snapshot found: $latest_remote_snapshot"
     log "Performing incremental send from $latest_remote_snapshot to $local_snapshot"
     if [ "$is_local" = true ]; then
       log "ZFS Command: zfs send $send_opts -I ${latest_remote_snapshot##*@} $local_snapshot | zfs recv -F $remote_dataset_path"
-      if ! zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | zfs recv -F "$remote_dataset_path"; then
+      if zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | zfs recv -F "$remote_dataset_path"; then
+        incremental_success=true
+      else
         log "Failed to send incremental snapshot $local_snapshot to $remote_dataset_path"
-        continue
       fi
     else
       if $use_mbuffer; then
         if $compression; then
           log "ZFS Command: zfs send $send_opts -I ${latest_remote_snapshot##*@} $local_snapshot | gzip | mbuffer -s 128k -m 1G | ssh $remote_user@$remote_server 'mbuffer -s 128k -m 1G | gunzip | zfs recv -F $remote_dataset_path'"
-          if ! zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | gzip | mbuffer -s 128k -m 1G | ssh "$remote_user@$remote_server" "mbuffer -s 128k -m 1G | gunzip | zfs recv -F $remote_dataset_path"; then
+          if zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | gzip | mbuffer -s 128k -m 1G | ssh "$remote_user@$remote_server" "mbuffer -s 128k -m 1G | gunzip | zfs recv -F $remote_dataset_path"; then
+            incremental_success=true
+          else
             log "Failed to send incremental snapshot $local_snapshot to $remote_server:$remote_dataset_path"
-            continue
           fi
         else
           log "ZFS Command: zfs send $send_opts -I ${latest_remote_snapshot##*@} $local_snapshot | mbuffer -s 128k -m 1G | ssh $remote_user@$remote_server 'mbuffer -s 128k -m 1G | zfs recv -F $remote_dataset_path'"
-          if ! zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | mbuffer -s 128k -m 1G | ssh "$remote_user@$remote_server" "mbuffer -s 128k -m 1G | zfs recv -F $remote_dataset_path"; then
+          if zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | mbuffer -s 128k -m 1G | ssh "$remote_user@$remote_server" "mbuffer -s 128k -m 1G | zfs recv -F $remote_dataset_path"; then
+            incremental_success=true
+          else
             log "Failed to send incremental snapshot $local_snapshot to $remote_server:$remote_dataset_path"
-            continue
           fi
         fi
       else
         if $compression; then
           log "ZFS Command: zfs send $send_opts -I ${latest_remote_snapshot##*@} $local_snapshot | gzip | ssh $remote_user@$remote_server 'gunzip | zfs recv -F $remote_dataset_path'"
-          if ! zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | gzip | ssh "$remote_user@$remote_server" "gunzip | zfs recv -F $remote_dataset_path"; then
+          if zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | gzip | ssh "$remote_user@$remote_server" "gunzip | zfs recv -F $remote_dataset_path"; then
+            incremental_success=true
+          else
             log "Failed to send incremental snapshot $local_snapshot to $remote_server:$remote_dataset_path"
-            continue
           fi
         else
           log "ZFS Command: zfs send $send_opts -I ${latest_remote_snapshot##*@} $local_snapshot | ssh $remote_user@$remote_server 'zfs recv -F $remote_dataset_path'"
-          if ! zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | ssh "$remote_user@$remote_server" "zfs recv -F $remote_dataset_path"; then
+          if zfs send $send_opts -I "${latest_remote_snapshot##*@}" "$local_snapshot" | ssh "$remote_user@$remote_server" "zfs recv -F $remote_dataset_path"; then
+            incremental_success=true
+          else
             log "Failed to send incremental snapshot $local_snapshot to $remote_server:$remote_dataset_path"
-            continue
           fi
         fi
       fi
@@ -236,40 +250,55 @@ for dataset in "${datasets[@]}"; do
     log "No remote snapshot found, performing full send of $local_snapshot"
     if [ "$is_local" = true ]; then
       log "ZFS Command: zfs send $send_opts $local_snapshot | zfs recv -F $remote_dataset_path"
-      if ! zfs send $send_opts "$local_snapshot" | zfs recv -F "$remote_dataset_path"; then
+      if zfs send $send_opts "$local_snapshot" | zfs recv -F "$remote_dataset_path"; then
+        incremental_success=true
+      else
         log "Failed to send full snapshot $local_snapshot to $remote_dataset_path"
-        continue
       fi
     else
       if $use_mbuffer; then
         if $compression; then
           log "ZFS Command: zfs send $send_opts $local_snapshot | gzip | mbuffer -s 128k -m 1G | ssh $remote_user@$remote_server 'mbuffer -s 128k -m 1G | gunzip | zfs recv -F $remote_dataset_path'"
-          if ! zfs send $send_opts "$local_snapshot" | gzip | mbuffer -s 128k -m 1G | ssh "$remote_user@$remote_server" "mbuffer -s 128k -m 1G | gunzip | zfs recv -F $remote_dataset_path"; then
+          if zfs send $send_opts "$local_snapshot" | gzip | mbuffer -s 128k -m 1G | ssh "$remote_user@$remote_server" "mbuffer -s 128k -m 1G | gunzip | zfs recv -F $remote_dataset_path"; then
+            incremental_success=true
+          else
             log "Failed to send full snapshot $local_snapshot to $remote_server:$remote_dataset_path"
-            continue
           fi
         else
           log "ZFS Command: zfs send $send_opts $local_snapshot | mbuffer -s 128k -m 1G | ssh $remote_user@$remote_server 'mbuffer -s 128k -m 1G | zfs recv -F $remote_dataset_path'"
-          if ! zfs send $send_opts "$local_snapshot" | mbuffer -s 128k -m 1G | ssh "$remote_user@$remote_server" "mbuffer -s 128k -m 1G | zfs recv -F $remote_dataset_path"; then
+          if zfs send $send_opts "$local_snapshot" | mbuffer -s 128k -m 1G | ssh "$remote_user@$remote_server" "mbuffer -s 128k -m 1G | zfs recv -F $remote_dataset_path"; then
+            incremental_success=true
+          else
             log "Failed to send full snapshot $local_snapshot to $remote_server:$remote_dataset_path"
-            continue
           fi
         fi
       else
         if $compression; then
           log "ZFS Command: zfs send $send_opts $local_snapshot | gzip | ssh $remote_user@$remote_server 'gunzip | zfs recv -F $remote_dataset_path'"
-          if ! zfs send $send_opts "$local_snapshot" | gzip | ssh "$remote_user@$remote_server" "gunzip | zfs recv -F $remote_dataset_path"; then
+          if zfs send $send_opts "$local_snapshot" | gzip | ssh "$remote_user@$remote_server" "gunzip | zfs recv -F $remote_dataset_path"; then
+            incremental_success=true
+          else
             log "Failed to send full snapshot $local_snapshot to $remote_server:$remote_dataset_path"
-            continue
           fi
         else
-          log "ZFS Command: zfs send $send_opts $local_snapshot | ssh $remote_user@$remote_server 'zfs recv -F $remote_dataset_path'"
-          if ! zfs send $send_opts "$local_snapshot" | ssh "$remote_user@$remote_server" "zfs recv -F $remote_dataset_path"; then
+          log "ZFS Command: zfs send $local_snapshot | ssh $remote_user@$remote_server 'zfs recv -F $remote_dataset_path'"
+          if zfs send "$local_snapshot" | ssh "$remote_user@$remote_server" "zfs recv -F $remote_dataset_path"; then
+            incremental_success=true
+          else
             log "Failed to send full snapshot $local_snapshot to $remote_server:$remote_dataset_path"
-            continue
           fi
         fi
       fi
+    fi
+  fi
+
+  if [ "$incremental_success" = false ] && [ "$force_incremental" = true ]; then
+    log "Incremental send failed and force incremental option is enabled. Performing full send."
+    delete_remote_snapshots "$remote_dataset_path"
+    log "ZFS Command: zfs send $send_opts $local_snapshot | ssh $remote_user@$remote_server 'zfs recv -F $remote_dataset_path'"
+    if ! zfs send "$local_snapshot" | ssh "$remote_user@$remote_server" "zfs recv -F $remote_dataset_path"; then
+      log "Failed to send full snapshot $local_snapshot to $remote_server:$remote_dataset_path"
+      continue
     fi
   fi
 
