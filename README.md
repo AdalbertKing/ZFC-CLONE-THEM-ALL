@@ -47,33 +47,6 @@ Description
 cron.txt provides example cron jobs for automating the execution of snapsend.sh and delsnaps.sh.
 Content
 
-MAILTO=""
-SHELL=/bin/bash
-PATH=/etc:/bin:/sbin:/usr/bin:/usr/sbin:/root/skrypty:/root/scripts/zfs-snapshot-all
-
-# Hourly snapshot
-0 * * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_hourly_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
-5 * * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_hourly_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0" "192.168.28.8:" 2>>/root/scripts/cron.log
-
-# Daily snapshot
-10 0 * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_daily_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
-15 * * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_daily_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0" "192.168.28.8:" 2>>/root/scripts/cron.log
-16 0 * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_daily_" "rpool/ROOT/pve-1" "192.168.28.8:hdd/kopie/pve1" 2>>/root/scripts/cron.log
-
-# Weekly snapshot
-20 0 * * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_weekly_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
-25 0 * * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_weekly_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0" "192.168.28.8:" 2>>/root/scripts/cron.log
-
-# Monthly snapshot
-30 0 1 * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_monthly_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
-35 0 1 * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_monthly_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0" "192.168.28.8:" 2>>/root/scripts/cron.log
-
-# Delete old snapshots
-40 * * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_hourly -h24 2>>/root/scripts/cron.log
-46 0 * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_daily -d30 2>>/root/scripts/cron.log
-48 0 * * 0 /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_weekly -w4 2>>/root/scripts/cron.log
-50 0 1 * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_monthly -m12 2>>/root/scripts/cron.log
-42 * * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks zincrsend_zincrsend -d31 2>>/root/scripts/cron.log
 
 
 
