@@ -1,34 +1,66 @@
 #!/bin/bash
 
-# SnapSend Script
 # Author: Wojciech Król & ChatGPT-4o
 # Email: lurk@lurk.com.pl
-# Version: 1.0 (2024-07-26)
+# Version: 1.1, 2024-07-27
 
 # Description:
-# This script deletes ZFS snapshots based on a specified age threshold.
+# This script automates the process of deleting old ZFS snapshots based on specified age criteria.
+# It supports recursive operations for specified datasets.
 
-# Usage examples:
-# 1. Delete snapshots older than 1 year and 6 months for datasets "tank/data1" and "tank/data2" recursively:
-#    ./delsnaps.sh -R "tank/data1,tank/data2" "backup-" -y1 -m6 -d0 -h0
-# 2. Delete snapshots older than 2 years without recursion for dataset "tank/data3":
-#    ./delsnaps.sh "tank/data3" "snapshot-" -y2 -m0 -d0 -h0
+# Usage:
+# ./delsnaps.sh [-R] <dataset_list> <pattern> -y<years> -m<months> -w<weeks> -d<days> -h<hours>
 
 # Options:
-# -R                   : Recursively process child datasets.
-# -y <years>           : Number of years.
-# -m <months>          : Number of months.
-# -w <weeks>           : Number of weeks.
-# -d <days>            : Number of days.
-# -h <hours>           : Number of hours.
+# -R                         Enable recursive operation.
+# <dataset_list>             Comma-separated list of datasets.
+# <pattern>                  Pattern to match snapshots for deletion.
+# -y <years>                 Specify the age in years.
+# -m <months>                Specify the age in months.
+# -w <weeks>                 Specify the age in weeks.
+# -d <days>                  Specify the age in days.
+# -h <hours>                 Specify the age in hours.
 
-# Function to display script usage
+# Examples:
+
+# Delete Hourly Snapshots Older Than 24 Hours:
+# ./delsnaps.sh -R "hdd/vm-disks,rpool/data" "automated_hourly" -h24
+
+# Delete Daily Snapshots Older Than 30 Days:
+# ./delsnaps.sh -R "hdd/vm-disks,rpool/data" "automated_daily" -d30
+
+# Delete Weekly Snapshots Older Than 4 Weeks:
+# ./delsnaps.sh -R "hdd/vm-disks,rpool/data" "automated_weekly" -w4
+
+# Delete Monthly Snapshots Older Than 12 Months:
+# ./delsnaps.sh -R "hdd/vm-disks,rpool/data" "automated_monthly" -m12
+
+# Sprawdzenie liczby argumentów
+if [ "$#" -lt 3 ]; then
+    usage
+fi
+
+recurse=false
+
+# Sprawdzenie, czy pierwszy argument to -R
+if [ "$1" == "-R" ]; then
+    recurse=true
+    shift
+fi
+
+# Pobranie argumentów
+datasets_list="$1"
+shift
+pattern="$1"
+shift
+
+# Funkcja do wyświetlania użycia skryptu
 usage() {
-    echo "Usage: $0 [-R] <comma-separated list of datasets> <pattern> -y<years> -m<months> -w<weeks> -d<days> -h<hours>"
+    echo "Użycie: $0 [-R] <lista datasetów oddzielonych przecinkami> <maska> -y<years> -m<months> -w<weeks> -d<days> -h<hours>"
     exit 1
 }
 
-# Function to parse time arguments
+# Funkcja do parsowania argumentów czasu
 parse_time_arguments() {
     years=0
     months=0
@@ -60,12 +92,12 @@ parse_time_arguments() {
     done
 }
 
-# Function to calculate the threshold date
+# Funkcja do obliczenia daty granicznej
 calculate_threshold_date() {
     echo $(date -d "-${years} years -${months} months -${weeks} weeks -${days} days -${hours} hours" +%s)
 }
 
-# Function to delete snapshots
+# Funkcja do usuwania migawek
 delete_snapshots() {
     local ds="$1"
     local pat="$2"
@@ -85,18 +117,18 @@ delete_snapshots() {
         echo "Debug: Snapshot = $snapshot, creation_date = $creation_date, creation_date_sec = $creation_date_sec"
 
         if [ ${creation_date_sec} -lt ${th_date} ]; then
-            echo "Deleting snapshot: ${snapshot}"
+            echo "Usuwanie migawki: ${snapshot}"
             zfs destroy -R "${snapshot}"
             if [ $? -ne 0 ]; then
-                echo "Error deleting snapshot: ${snapshot}"
+                echo "Błąd podczas usuwania migawki: ${snapshot}"
             fi
         else
-            echo "Keeping snapshot: ${snapshot} (newer than threshold)"
+            echo "Zachowanie migawki: ${snapshot} (nowsza niż threshold)"
         fi
     done
 }
 
-# Function to recursively process datasets
+# Funkcja do przetwarzania datasetów rekurencyjnie
 process_datasets_recursively() {
     local base_ds="$1"
     local pat="$2"
@@ -111,7 +143,7 @@ process_datasets_recursively() {
     done
 }
 
-# Main function to process datasets
+# Funkcja główna do przetwarzania datasetów
 process_datasets() {
     local recurse="$1"
     local datasets_list="$2"
@@ -129,31 +161,12 @@ process_datasets() {
     done
 }
 
-# Check number of arguments
-if [ "$#" -lt 3 ]; then
-    usage
-fi
-
-recurse=false
-
-# Check if first argument is -R
-if [ "$1" == "-R" ]; then
-    recurse=true
-    shift
-fi
-
-# Get arguments
-datasets_list="$1"
-shift
-pattern="$1"
-shift
-
-# Parse time arguments
+# Parsowanie argumentów czasu
 parse_time_arguments "$@"
 
-# Calculate threshold date
+# Obliczenie daty granicznej
 threshold_date=$(calculate_threshold_date)
 echo "Debug: threshold_date = $threshold_date ($(date -d "@$threshold_date"))"
 
-# Process datasets
+# Przetwarzanie datasetów
 process_datasets "$recurse" "$datasets_list" "$pattern" "$threshold_date"
