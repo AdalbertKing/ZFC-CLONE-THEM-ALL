@@ -1,5 +1,5 @@
 README.md
-Snapsend.sh
+Snapsend.sh, delsnaps.sh
 Author: Wojciech Król & ChatGPT-4o
 Version: 1.65, 2024-07-28
 Overview
