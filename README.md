@@ -1,54 +1,53 @@
-# ZFS Snapshots and Synchronization Scripts
+README.md
+Snapsend08.sh
+Author: Wojciech Król & ChatGPT-4o
+Version: 1.65, 2024-07-28
+Overview
 
-## Description
+snapsend.sh is a robust script designed for ZFS snapshot management, supporting various configurations for local and remote operations, including compression, buffering, and forceful full send in case of incremental send failure.
+Modes of Operation
 
-These scripts are designed to automate the process of creating, sending, and deleting ZFS snapshots. They support both local and remote operations and include features for compression and buffering.
+The script supports three distinct modes of operation:
 
-### Authors
+    Local Mode: Transfers snapshots within the same server.
+    Remote Backup Mode: Transfers snapshots to a remote backup server.
+    Remote Synchronization Mode: Keeps datasets synchronized between local and remote servers.
 
-- Wojciech Król & ChatGPT-4o
-- Email: lurk@lurk.com.pl
-- Version: 1.1, 2024-07-27
+Script Options
 
-## `snapsend.sh`
+    -m: Custom snapshot prefix.
+    -u: Custom SSH user.
+    -k: SSH password.
+    -p: SSH port (default: 22).
+    -R: Recursion for datasets.
+    -b: Use mbuffer for buffering.
+    -z: Use gzip for compression.
+    -f: Force full send if incremental fails.
+    -F: Force full send immediately.
+    -v: Verbose level (1: minimal, 2: normal, 3: debug).
+    usage:
+    ./snapsend.sh [-m snapshot_prefix] [-u remote_user] [-k password] [-p remote_port] [-R] [-b] [-z] [-f] [-F] [-v verbose_level] local_datasets remote
 
-### Description
+    Examples:
+Local Mode
+./snapsend.sh -m "automated_hourly_" -R -F "hdd/test/hv1" "hdd/kopie"
+This command creates and sends snapshots of hdd/test/hv1 to hdd/kopie with recursion and forceful full send.
 
-`snapsend02.sh` is a script for creating and sending ZFS snapshots. It supports both local and remote destinations, with options for recursion, compression, and buffering.
+This command creates and sends snapshots of hdd/test/hv1 to the remote server 192.168.28.8 under /backups using SSH with the specified user and password.
 
-### Usage
+Remote Synchronization Mode
+./snapsend.sh -m "automated_hourly_" -R -F -u "root" -k "password" "rpool/data/vm-100-disk-0" "192.168.28.8:/backups"
 
-```bash
-./snapsend.sh [options] <local_datasets> <remote>
-Options
+This command keeps the dataset rpool/data/vm-100-disk-0 synchronized between the local server and the remote server at 192.168.28.8:/backups.
+Warnings and Considerations
+Using -f and -F
 
-    -R: Enable recursive operation.
-    <dataset_list>: Comma-separated list of datasets.
-    <pattern>: Pattern to match snapshots for deletion.
-    -y <years>: Specify the age in years.
-    -m <months>: Specify the age in months.
-    -w <weeks>: Specify the age in weeks.
-    -d <days>: Specify the age in days.
-    -h <hours>: Specify the age in hours.
+Using -f (force incremental) in combination with -R (recursive) can lead to a full send for all child datasets if an issue occurs with one of them. This can result in long transfer times and high network usage. Use with caution.
+Scenario:
+Imagine a Proxmox server with multiple large virtual machines. If an admin accidentally deletes the last snapshot for rpool/data/vm-100-disk-0, the target server will have one redundant snapshot. This will prevent an incremental ZFS send. Using the script with ./snapsend.sh -m "automated_hourly_" -R -f "rpool/data/vm-disks" "192.168.28.8:hdd/kopie" will trigger a full ZFS send for all VMs from source to target, after performing zfs destroy hdd/kopie/rpool/data/vm-disks. This can lead to hours of network load and halt the transfer of other snapshots.
+Contact
 
-Examples
-Delete Hourly Snapshots Older Than 24 Hours
-./delsnaps.sh -R "hdd/vm-disks,rpool/data" "automated_hourly" -h24
-Delete Daily Snapshots Older Than 30 Days
-./delsnaps.sh -R "hdd/vm-disks,rpool/data" "automated_daily" -d30
-Delete Weekly Snapshots Older Than 4 Weeks
-./delsnaps.sh -R "hdd/vm-disks,rpool/data" "automated_weekly" -w4
-Delete Monthly Snapshots Older Than 12 Months
-./delsnaps.sh -R "hdd/vm-disks,rpool/data" "automated_monthly" -m12
-
-cron.txt
-Description
-
-cron.txt provides example cron jobs for automating the execution of snapsend.sh and delsnaps.sh.
-Content
-
-
-
+For any further questions or issues, please contact the author at lurk@lurk.com.pl.
 
 
 
