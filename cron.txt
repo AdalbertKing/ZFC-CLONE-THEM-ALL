@@ -48,5 +48,4 @@ PATH=/etc:/bin:/sbin:/usr/bin:/usr/sbin:/root/skrypty:/root/scripts/zfs-snapshot
 # Delete monthly snapshots older than 12 months recursively for datasets "hdd/vm-disks" and "rpool/data" at 00:50 on the first day of every month
 50 0 1 * 0 /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_monthly -m12 2>>/root/scripts/cron.log
 
-# Delete snapshots older than 31 days recursively for dataset "hdd/vm-disks" with pattern "zincrsend_zincrsend" every hour at 42 minutes past
-42 * * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks zincrsend_zincrsend -d31 2>>/root/scripts/cron.log
+
