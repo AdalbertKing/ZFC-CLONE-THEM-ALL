@@ -2,32 +2,51 @@ MAILTO=""
 SHELL=/bin/bash
 PATH=/etc:/bin:/sbin:/usr/bin:/usr/sbin:/root/skrypty:/root/scripts/zfs-snapshot-all
 
-#30 18 * * * /root/skrypty/qm-day.sh >>/root/skrypty/cron.log
-#59 6 * * 1-5 /root/skrypty/102.sh >>/root/skrypty/cron.log
+# Uncommented example cron jobs
+# # Run qm-day.sh script every day at 18:30
+# 30 18 * * * /root/skrypty/qm-day.sh >>/root/skrypty/cron.log
+# 
+# # Run 102.sh script every weekday at 06:59
+# 59 6 * * 1-5 /root/skrypty/102.sh >>/root/skrypty/cron.log
 
+# Automated hourly snapshots with compression and mbuffer for dataset "rpool/data" sent to remote server every hour
 0 * * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_hourly_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
+
+# Automated hourly snapshots with compression and mbuffer for multiple VM disks sent to remote server every hour at 5 minutes past
 5 * * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_hourly_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0,hdd/vm-disks/vm-100-disk-0,hdd/vm-disks/vm-102-disk-0" "192.168.28.8:" 2>>/root/scripts/cron.log
 
+# Automated daily snapshots with compression and mbuffer for dataset "rpool/data" sent to remote server every day at midnight
 10 0 * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_daily_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
+
+# Automated daily snapshots with compression and mbuffer for multiple VM disks sent to remote server every day at 00:15
 15 0 * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_daily_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0,hdd/vm-disks/vm-100-disk-0,hdd/vm-disks/vm-102-disk-0" "192.168.28.8:" 2>>/root/scripts/cron.log
 
+# Automated daily snapshot for the root dataset sent to a specific remote path every day at 00:16
 16 0 * * * /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_daily_" "rpool/ROOT/pve-1" "192.168.28.8:hdd/kopie/pve1" 2>>/root/scripts/cron.log
 
+# Automated weekly snapshots with compression and mbuffer for dataset "rpool/data" sent to remote server every Sunday at 00:20
 20 0 * * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_weekly_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
+
+# Automated weekly snapshots with compression and mbuffer for multiple VM disks sent to remote server every Sunday at 00:25
 25 0 * * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_weekly_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0,hdd/vm-disks/vm-100-disk-0,hdd/vm-disks/vm-102-disk-0" "192.168.28.8:" 2>>/root/scripts/cron.log
 
+# Automated monthly snapshots with compression and mbuffer for dataset "rpool/data" sent to remote server at 00:30 on the first day of every month
 30 0 1 * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_monthly_" -R -z -b "rpool/data" "192.168.28.8:" 2>>/root/scripts/cron.log
+
+# Automated monthly snapshots with compression and mbuffer for multiple VM disks sent to remote server at 00:35 on the first day of every month
 35 0 1 * 0 /root/scripts/zfs-snapshot-all/snapsend.sh -m "automated_monthly_" -z -b "hdd/vm-disks/subvol-101-disk-0,hdd/vm-disks/subvol-101-disk-1,hdd/vm-disks/subvol-107-disk-0,hdd/vm-disks/vm-100-disk-0,hdd/vm-disks/vm-102-disk-0" "192.168.28.8:" 2>>/root/scripts/cron.log
 
+# Delete hourly snapshots older than 24 hours recursively for datasets "hdd/vm-disks" and "rpool/data" every hour at 40 minutes past
 40 * * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_hourly -h24 2>>/root/scripts/cron.log
 
+# Delete daily snapshots older than 30 days recursively for datasets "hdd/vm-disks" and "rpool/data" every day at 00:46
 46 0 * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_daily -d30 2>>/root/scripts/cron.log
 
+# Delete weekly snapshots older than 4 weeks recursively for datasets "hdd/vm-disks" and "rpool/data" every Sunday at 00:48
 48 0 * * 0 /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_weekly -w4 2>>/root/scripts/cron.log
 
+# Delete monthly snapshots older than 12 months recursively for datasets "hdd/vm-disks" and "rpool/data" at 00:50 on the first day of every month
 50 0 1 * 0 /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_monthly -m12 2>>/root/scripts/cron.log
 
-
-
-
-
+# Delete snapshots older than 31 days recursively for dataset "hdd/vm-disks" with pattern "zincrsend_zincrsend" every hour at 42 minutes past
+42 * * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks zincrsend_zincrsend -d31 2>>/root/scripts/cron.log
