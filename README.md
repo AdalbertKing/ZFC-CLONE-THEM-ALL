@@ -39,10 +39,10 @@
  ### Local Mode
 
  ```bash
- ./snapsend.sh -m "automated_hourly_" -R -z -b "rpool/data" "192.168.28.8:"
+ ./snapsend.sh -m "automated_hourly_" -R -z -b "rpool/data" "hdd/backups"
  ```
 
- This command creates and sends snapshots of `rpool/data` to `192.168.28.8:` with recursion, gzip compression, and buffering.
+ This command creates and sends snapshots of `rpool/data` to `hdd/backups` with recursion, gzip compression, and buffering.
 
  ### Remote Synchronization Mode
 
@@ -83,14 +83,6 @@
  ```
 
  This command attempts to send an incremental snapshot of `rpool/data/vm-100-disk-0` to `192.168.28.8:/backups` without forcing a full send on failure.
-
- ### Example with Debugging and Without SSH Credentials
-
- ```bash
- ./snapsend.sh -m "automated_hourly_" -R -v 3 "rpool/data" "192.168.28.8:/backups"
- ```
-
- This command creates and sends snapshots of `rpool/data` to `192.168.28.8:/backups` with recursion and debug-level verbosity. Note that SSH keys must be exchanged between servers for passwordless login. For more information on setting up SSH key-based authentication, refer to this [guide](https://www.ssh.com/ssh/keygen/).
 
  ## Warnings and Considerations
 
@@ -198,7 +190,8 @@
  46 0 * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_daily -d30 2/root/scripts/cron.log
  48 0 * * 0 /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_weekly -w4 2/root/scripts/cron.log
  50 0 1 * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks,rpool/data automated_monthly -m12 2/root/scripts/cron.log
-  ```
+ 42 * * * * /root/scripts/zfs-snapshot-all/delsnaps.sh -R hdd/vm-disks zincrsend_zincrsend -d31 2/root/scripts/cron.log
+ ```
 
  ## Summary
 
