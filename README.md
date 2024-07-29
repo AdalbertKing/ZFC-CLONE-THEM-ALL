@@ -86,7 +86,7 @@
 
  ## Warnings and Considerations
 
- ### Using -f and -F
+ ### Using -f and -F (Unconditional force to send full snapshot)
 
  Using `-f` (force incremental) in combination with `-R` (recursive) can lead to a full send for all child datasets if an issue occurs with one of them. This can result in long transfer times and high network usage. Use with caution.
 
